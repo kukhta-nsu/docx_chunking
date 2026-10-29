@@ -1,0 +1,68 @@
+name: smoke
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  cli:
+    name: python ${{ matrix.python }} on ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest]
+        python: ["3.10", "3.11", "3.12", "3.13"]
+        include:
+          - { os: windows-latest, python: "3.12" }
+          - { os: macos-latest, python: "3.12" }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+      - run: pip install .
+      - name: Собрать документ с объединёнными ячейками
+        shell: bash
+        run: |
+          mkdir -p documents
+          python - <<'PY'
+          import zipfile
+          W = "http://schemas.openxmlformats.org/wordprocessingml/2006/main"
+          CT = ('<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">'
+                '<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>'
+                '<Default Extension="xml" ContentType="application/xml"/><Override PartName="/word/document.xml"'
+                ' ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/></Types>')
+          RE = ('<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'
+                '<Relationship Id="rId1" Target="word/document.xml" Type="http://schemas.openxmlformats.org/'
+                'officeDocument/2006/relationships/officeDocument"/></Relationships>')
+          p = lambda t: "<w:p><w:r><w:t>%s</w:t></w:r></w:p>" % t
+          c = lambda t="", pr="": "<w:tc>%s%s</w:tc>" % ("<w:tcPr>%s</w:tcPr>" % pr if pr else "", p(t))
+          r = lambda *cs: "<w:tr>%s</w:tr>" % "".join(cs)
+          body = "".join([
+              p("1 ЦЕЛЬ"), p("Определить порядок работы с документами."),
+              p("2 ОБЛАСТЬ ПРИМЕНЕНИЯ"), p("Все подразделения."),
+              p("5 ОПИСАНИЕ РАБОТЫ"), p("5.1 ХРАНЕНИЕ"),
+              "<w:tbl>%s</w:tbl>" % "".join([
+                  r(c("№"), c("Хранение", "<w:gridSpan w:val='2'/>")),
+                  r(c("", "<w:vMerge/>"), c("место"), c("срок")),
+                  r(c("1"), c("ООиОТ"), c("3 года")),
+                  r(c("2"), c("Архив"), c("постоянно"))])])
+          with zipfile.ZipFile("documents/sample.docx", "w") as z:
+              z.writestr("[Content_Types].xml", CT)
+              z.writestr("_rels/.rels", RE)
+              z.writestr("word/document.xml",
+                         "<w:document xmlns:w='%s'><w:body>%s</w:body></w:document>" % (W, body))
+          PY
+      - name: Разбор, нарезка и контроли
+        shell: bash
+        run: |
+          docx-chunking check
+          docx-chunking sections
+          docx-chunking tables
+          docx-chunking chunk
+          test -s chunks/chunks.jsonl
+          docx-chunking chunk --split-wide-records --target 120 --hard 200
+          docx-chunking chunk -o - | head -1

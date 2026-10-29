@@ -1,0 +1,46 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "docx-chunking"
+version = "0.1.0"
+description = "Parse Word .docx into a section tree and chunk it for retrieval — tables with merged cells included, no embeddings required."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { file = "LICENSE" }
+authors = [{ name = "Georgy Kukhta", email = "g.kukhta@g.nsu.ru" }]
+keywords = ["docx", "word", "chunking", "rag", "retrieval", "parsing", "tables", "ooxml"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Text Processing :: Markup",
+    "Topic :: Text Processing :: Linguistic",
+]
+# Ядро работает на стандартной библиотеке: структура OOXML записана
+# в файле точно, zipfile + xml.etree достаточно.
+dependencies = []
+
+[project.optional-dependencies]
+# Точный счёт токенов и нарезка по предложениям под токенизатор модели.
+tokenizers = ["tokenizers>=0.15", "semantic-text-splitter>=0.33"]
+# Выгрузка чанков в parquet.
+parquet = ["pandas>=2.0", "pyarrow>=14"]
+
+[project.scripts]
+docx-chunking = "docx_chunking.cli:main"
+
+[project.urls]
+Homepage = "https://github.com/kukhta-nsu/docx_chunking"
+Repository = "https://github.com/kukhta-nsu/docx_chunking"
+Issues = "https://github.com/kukhta-nsu/docx_chunking/issues"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/docx_chunking"]
